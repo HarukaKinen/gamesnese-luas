@@ -54,6 +54,7 @@ variables = {
             variables.display_text = " "..variables.display_text
         end
         local update_interval = ui.get(variables.clantag_update_interval) / 10
+
         local tickcount = globals.tickcount() + functions.time_to_ticks(client.latency())
         local i = tickcount / functions.time_to_ticks(update_interval)
 
@@ -166,6 +167,7 @@ callbacks = {
 
     player_connect_full = function(e)
         if client.userid_to_entindex(e.userid) == entity.get_local_player() then 
+            variables.initialize_display_text()
             variables.original_clantag = functions.get_original_clantag()
         end
     end,
@@ -212,6 +214,7 @@ callbacks = {
     ui_checkbox = function(self)
         if self == variables.clantag_enabled then
             ui.set_visible(variables.clantag_type, ui.get(self))
+            ui.set_visible(variables.clantag_update_interval, ui.get(self))
             if not ui.get(self) then 
                 client.set_clan_tag(variables.original_clantag)
                 return
@@ -231,7 +234,7 @@ callbacks = {
     ui_combobox = function(self)
         local is_builder = ui.get(self) == "Builder"
         ui.set_visible(variables.clantag_update_interval, is_builder)
-        if is_builder then
+        if is_builder and entity.get_local_player() ~= then
             variables.initialize_display_text()
         end
     end,
@@ -247,6 +250,7 @@ callbacks = {
 
 variables.original_clantag = functions.get_original_clantag()
 variables.initialize_clantag(database.read("deadwinter.clantag") or "set_your_clantag")
+variables.initialize_display_text()
 client.log("Current clantag: \""..variables.clantag.."\". Example: set_clantag netorare.gang")
 
 ui.set_visible(variables.clantag_type, false)
