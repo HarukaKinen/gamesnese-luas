@@ -234,7 +234,7 @@ callbacks = {
     ui_combobox = function(self)
         local is_builder = ui.get(self) == "Builder"
         ui.set_visible(variables.clantag_update_interval, is_builder)
-        if is_builder and entity.get_local_player() ~= then
+        if is_builder and entity.get_local_player() ~= nil then
             variables.initialize_display_text()
         end
     end,
