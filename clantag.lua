@@ -214,11 +214,18 @@ callbacks = {
     ui_checkbox = function(self)
         if self == variables.clantag_enabled then
             ui.set_visible(variables.clantag_type, ui.get(self))
-            ui.set_visible(variables.clantag_update_interval, ui.get(self))
+
+            if ui.get(variables.clantag_type) == "Builder" then
+                ui.set_visible(variables.clantag_update_interval, ui.get(self))
+            end
+
             if not ui.get(self) then 
                 client.set_clan_tag(variables.original_clantag)
-                return
+            else
+                variables.initialize_display_text()
             end
+            
+            return
         end
 
         if self == variables.ref_gamesense_clantag then
