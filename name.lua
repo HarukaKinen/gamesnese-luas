@@ -20,7 +20,7 @@ end
 function player_connect_full(e)
     if client.userid_to_entindex(e.userid) == entity.get_local_player() then 
         client.delay_call(globals.tickinterval(), function()
-            local is_warmup_period = entity.get_prop( ntity.get_game_rules(), "m_bWarmupPeriod")
+            local is_warmup_period = entity.get_prop(entity.get_game_rules(), "m_bWarmupPeriod")
             if is_warmup_period == 0 then
                 if not stole_player_name then
                     ui.set(stealname, true)
