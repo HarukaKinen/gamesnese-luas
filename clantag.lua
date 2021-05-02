@@ -1,5 +1,9 @@
 local steamworks = require "gamesense/steamworks"
 
+if steamworks == nil then
+    error("Steamworks is nil, make sure you have subscribed SteamWork SDK from lua workshop")
+end
+
 function string:manipulate(index, character)
     return self:sub(1,index-1)..character..self:sub(index+1,-1)
 end
