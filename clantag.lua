@@ -29,42 +29,43 @@ variables = {
 
     clantag_characters = { },
 
-    display_text = "",
-
-    text_count = 1,
-    builder_count = 1,
-
-    next_tickcount_to_change = 0,
+    built_clantag = { },
 
     initialize_clantag = function(text)
         variables.clantag = text
         variables.clantag_characters = { }
-        variables.display_text = "\0"
-        variables.builder_count = 0
-        variables.next_tickcount_to_change = 0
 
         for c in text:gmatch"." do
             table.insert(variables.clantag_characters, c)
         end
 
-        for i=1, #text - 1 do
-            variables.display_text = " "..variables.display_text
-        end
     end,
 
     initialize_display_text = function()
-        variables.display_text = "\0"
+        variables.built_clantag = { }
+        local display_text = "\0"
         for i=1, #variables.clantag_characters - 1 do
-            variables.display_text = " "..variables.display_text
+            display_text = " "..display_text
         end
-        local update_interval = ui.get(variables.clantag_update_interval) / 10
 
-        local tickcount = globals.tickcount() + functions.time_to_ticks(client.latency())
-        local i = tickcount / functions.time_to_ticks(update_interval)
+        local last_text = display_text
+        table.insert(variables.built_clantag, " ")
+        for i=1, #variables.clantag_characters do
+            for j=1, #variables.builder_characters do
+                last_text = last_text:manipulate(i, variables.builder_characters[j])
+                table.insert(variables.built_clantag, last_text)
+            end
+            last_text = last_text:manipulate(i, variables.clantag_characters[i])
+            table.insert(variables.built_clantag, last_text)
+        end
 
-        variables.text_count = math.floor(i % #variables.clantag_characters) + 1
-        variables.builder_count = math.floor(i % #variables.builder_characters) + 1
-        variables.display_text = variables.clantag:sub(1, variables.text_count)
+        table.insert(variables.built_clantag, variables.clantag)
+
+        -- strip the string
+        for i=2, #variables.built_clantag do
+            variables.built_clantag[i] = variables.built_clantag[i]:gsub("%s+", "")
+        end
+
     end
 
 }
@@ -99,25 +100,11 @@ functions = {
     end,
 
     builder_animation = function()
-        local final_text = variables.display_text        
-        --print(variables.builder_count.." | "..#variables.builder_characters.." | "..variables.text_count.." | "..#variables.clantag_characters.." | "..math.floor(i % #variables.clantag_characters).." | "..math.floor(i % #variables.builder_characters))
-
-        if variables.text_count <= #variables.clantag_characters then
-            if variables.builder_count < #variables.builder_characters then
-                variables.builder_count = variables.builder_count + 1
-                variables.display_text = final_text:manipulate(variables.text_count, variables.builder_characters[variables.builder_count])
-            else
-                variables.builder_count = 1
-                variables.display_text = final_text:manipulate(variables.text_count, variables.clantag_characters[variables.text_count])
-                variables.text_count = variables.text_count + 1
-            end
-        else
-            variables.text_count = 1
-            variables.display_text = "\0"
-            for i=1, #variables.clantag - 1 do
-                variables.display_text = " "..variables.display_text
-            end
-        end
+        local update_interval = ui.get(variables.clantag_update_interval) / 10
+        local tickcount = globals.tickcount() + functions.time_to_ticks(client.latency())
+        local i = tickcount / functions.time_to_ticks(update_interval)
+        i = math.floor(i % #variables.built_clantag) + 1
+        return variables.built_clantag[i]
     end,
 
     run_clantag_animation = function()
@@ -142,12 +129,13 @@ functions = {
 
             variables.previous_clantag = clan_tag
         elseif ui.get(variables.clantag_type) == "Builder" then 
-            if globals.tickcount() >= variables.next_tickcount_to_change then
-                functions.builder_animation()
-                client.set_clan_tag(variables.display_text)
-                local update_interval = ui.get(variables.clantag_update_interval) / 10
-                variables.next_tickcount_to_change = globals.tickcount() + functions.time_to_ticks(update_interval)
+            local clan_tag = functions.builder_animation()
+
+            if clan_tag ~= variables.previous_clantag then
+                client.set_clan_tag(clan_tag)
             end
+
+            variables.previous_clantag = clan_tag
         end
     end
 }
@@ -171,7 +159,6 @@ callbacks = {
 
     player_connect_full = function(e)
         if client.userid_to_entindex(e.userid) == entity.get_local_player() then 
-            variables.initialize_display_text()
             variables.original_clantag = functions.get_original_clantag()
         end
     end,
@@ -225,10 +212,8 @@ callbacks = {
 
             if not ui.get(self) then 
                 client.set_clan_tag(variables.original_clantag)
-            else
-                variables.initialize_display_text()
             end
-            
+
             return
         end
 
@@ -245,13 +230,6 @@ callbacks = {
     ui_combobox = function(self)
         local is_builder = ui.get(self) == "Builder"
         ui.set_visible(variables.clantag_update_interval, is_builder)
-        if is_builder and entity.get_local_player() ~= nil then
-            variables.initialize_display_text()
-        end
-    end,
-
-    ui_slider = function(self)
-        variables.initialize_display_text()
     end,
 
     shutdown = function()
@@ -269,7 +247,6 @@ ui.set_visible(variables.clantag_update_interval, false)
 ui.set_callback(variables.clantag_enabled, callbacks.ui_checkbox)
 ui.set_callback(variables.ref_gamesense_clantag, callbacks.ui_checkbox)
 ui.set_callback(variables.clantag_type, callbacks.ui_combobox)
-ui.set_callback(variables.clantag_update_interval, callbacks.ui_slider)
 client.set_event_callback("paint", callbacks.paint)
 client.set_event_callback("run_command", callbacks.run_command)
 client.set_event_callback("player_connect_full", callbacks.player_connect_full)
