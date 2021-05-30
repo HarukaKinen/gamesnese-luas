@@ -4,20 +4,26 @@ if steamworks == nil then
     error("Steamworks is nil, make sure you have subscribed SteamWork SDK from lua workshop")
 end
 
+local client_set_clan_tag, client_delay_call, client_log, client_latency, client_set_event_callback = client.set_clan_tag, client.delay_call, client.log, client.latency, client.set_event_callback
+local entity_get_local_player, entity_get_prop, entity_get_player_resource = entity.get_local_player, entity.get_prop, entity.get_player_resource
+local globals_tickcount, globals_tickinterval = globals.tickcount, globals.tickinterval
+local math_floor = math.floor
+local ui_get, ui_set_visible, ui_reference, ui_new_checkbox, ui_new_combobox, ui_new_slider, ui_set_callback = ui.get, ui.set_visible, ui.reference, ui.new_checkbox, ui.new_combobox, ui.new_slider, ui.set_callback
+
+local steam_friends = steamworks.ISteamFriends
+
 function string:manipulate(index, character)
     return self:sub(1,index-1)..character..self:sub(index+1,-1)
 end
 
 variables = {
-    steam_friends = steamworks.ISteamFriends,
 
-    ref_gamesense_clantag = ui.reference("MISC", "Miscellaneous", "Clan tag spammer"),
-    clantag_enabled = ui.new_checkbox("MISC", "Miscellaneous", "Custom ClanTag"),
-    clantag_type = ui.new_combobox("MISC", "Miscellaneous", "Clantag type", {"Static", "Loop", "Builder"}),
-    clantag_update_interval = ui.new_slider("MISC", "Miscellaneous", "Update interval", 1, 20, 10, true, "s", 0.1),
+    ref_gamesense_clantag = ui_reference("MISC", "Miscellaneous", "Clan tag spammer"),
+    clantag_enabled = ui_new_checkbox("MISC", "Miscellaneous", "Custom ClanTag"),
+    clantag_type = ui_new_combobox("MISC", "Miscellaneous", "Clantag type", {"Static", "Loop", "Builder"}),
+    clantag_update_interval = ui_new_slider("MISC", "Miscellaneous", "Update interval", 1, 20, 10, true, "s", 0.1),
     clantag = "",
 
-    original_clantag = "",
     previous_clantag = "",
 
     builder_characters = {
@@ -36,7 +42,7 @@ variables = {
         variables.clantag_characters = { }
 
         for c in text:gmatch"." do
-            table.insert(variables.clantag_characters, c)
+            variables.clantag_characters[#variables.clantag_characters + 1] = c
         end
 
     end,
@@ -49,25 +55,23 @@ variables = {
         end
 
         local last_text = display_text
-        table.insert(variables.built_clantag, " ")
+        variables.built_clantag[#variables.built_clantag + 1] = " "
         for i=1, #variables.clantag_characters do
             for j=1, #variables.builder_characters do
                 last_text = last_text:manipulate(i, variables.builder_characters[j])
-                table.insert(variables.built_clantag, last_text)
+                variables.built_clantag[#variables.built_clantag + 1] =  last_text
             end
             last_text = last_text:manipulate(i, variables.clantag_characters[i])
-            table.insert(variables.built_clantag, last_text)
+            variables.built_clantag[#variables.built_clantag + 1] = last_text
         end
 
-        table.insert(variables.built_clantag, variables.clantag)
+        variables.built_clantag[#variables.built_clantag] = variables.clantag
 
         -- strip the string
         for i=2, #variables.built_clantag do
             variables.built_clantag[i] = variables.built_clantag[i]:gsub("%s+", "")
         end
-
     end
-
 }
 
 functions = {
@@ -75,64 +79,64 @@ functions = {
         local clan_id = cvar.cl_clanid:get_int()
         if clan_id == 0 then return "\0" end
 
-        local clan_count = variables.steam_friends.GetClanCount()
+        local clan_count = steam_friends.GetClanCount()
         for i = 0, clan_count do 
-            group_id = variables.steam_friends.GetClanByIndex(i)
+            group_id = steam_friends.GetClanByIndex(i)
             if group_id == clan_id then
-                return variables.steam_friends.GetClanTag(group_id)
+                return steam_friends.GetClanTag(group_id)
             end
         end
     end,
 
     time_to_ticks = function(time)
-        return math.floor(time / globals.tickinterval() + 0.5)
+        return math_floor(time / globals_tickinterval() + 0.5)
     end,
 
     -- credit goes to @sapphyrus
     gamesense_animation = function(text, indices)
         local text_anim = "               " .. text .. "                      " 
-        local tickcount = globals.tickcount() + functions.time_to_ticks(client.latency())
+        local tickcount = globals_tickcount() + functions.time_to_ticks(client_latency())
         local i = tickcount / functions.time_to_ticks(0.3)
-        i = math.floor(i % #indices)
+        i = math_floor(i % #indices)
         i = indices[i+1]+1
     
-        return string.sub(text_anim, i, i+15)
+        return text_anim:sub(i, i+15)
     end,
 
     builder_animation = function()
-        local update_interval = ui.get(variables.clantag_update_interval) / 10
-        local tickcount = globals.tickcount() + functions.time_to_ticks(client.latency())
+        local update_interval = ui_get(variables.clantag_update_interval) / 10
+        local tickcount = globals_tickcount() + functions.time_to_ticks(client_latency())
         local i = tickcount / functions.time_to_ticks(update_interval)
-        i = math.floor(i % #variables.built_clantag) + 1
+        i = math_floor(i % #variables.built_clantag) + 1
         return variables.built_clantag[i]
     end,
 
     run_clantag_animation = function()
         -- if gamesense clantag spammer is enabled then we dont use our clantag
-        if ui.get(variables.ref_gamesense_clantag) then return end
+        if ui_get(variables.ref_gamesense_clantag) then return end
 
-        if not ui.get(variables.clantag_enabled) then return end
+        if not ui_get(variables.clantag_enabled) then return end
 
-        if ui.get(variables.clantag_type) == "Static" then
-            local clantag = entity.get_prop(entity.get_player_resource(), "m_szClan", entity.get_local_player())
+        if ui_get(variables.clantag_type) == "Static" then
+            local clan_tag = entity_get_prop(entity_get_player_resource(), "m_szClan", entity_get_local_player())
             
-            if clantag ~= variables.clantag then
-                client.set_clan_tag(variables.clantag)
+            if clan_tag ~= variables.clantag then
+                client_set_clan_tag(variables.clantag)
             end
 
-        elseif ui.get(variables.clantag_type) == "Loop" then
+        elseif ui_get(variables.clantag_type) == "Loop" then
             local clan_tag = functions.gamesense_animation(variables.clantag, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 11, 11, 11, 11, 11, 11, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22})
             
             if clan_tag ~= variables.previous_clantag then
-                client.set_clan_tag(clan_tag)
+                client_set_clan_tag(clan_tag)
             end
 
             variables.previous_clantag = clan_tag
-        elseif ui.get(variables.clantag_type) == "Builder" then 
+        elseif ui_get(variables.clantag_type) == "Builder" then 
             local clan_tag = functions.builder_animation()
 
             if clan_tag ~= variables.previous_clantag then
-                client.set_clan_tag(clan_tag)
+                client_set_clan_tag(clan_tag)
             end
 
             variables.previous_clantag = clan_tag
@@ -142,41 +146,35 @@ functions = {
 
 callbacks = {
     paint = function()
-        if entity.get_local_player() ~= nil then
-            if globals.tickcount() % 2 == 0 then
+        if entity_get_local_player() ~= nil then
+            if globals_tickcount() % 2 == 0 then
                 functions.run_clantag_animation()
             end
         end
     end,
 
     run_command = function(e)
-        if entity.get_local_player() ~= nil then 
+        if entity_get_local_player() ~= nil then 
             if e.chokedcommands == 0 then
                 functions.run_clantag_animation()
             end
         end
     end,
 
-    player_connect_full = function(e)
-        if client.userid_to_entindex(e.userid) == entity.get_local_player() then 
-            variables.original_clantag = functions.get_original_clantag()
-        end
-    end,
-
     console_input = function(text)
-        if string.sub(text, 1, #"set_clantag") == "set_clantag" then
+        if text:sub(1, #"set_clantag") == "set_clantag" then
             -- in case the clantag has spacebar
             local texts = { }
 
-            for segment in string.gmatch(text, "([^ ]+)") do 
+            for segment in text:gmatch("([^ ]+)") do 
                 -- ignore the command
                 if segment ~= "set_clantag" then
-                    table.insert(texts, segment)
+                    texts[#texts + 1] = segment
                 end
             end
 
             if #texts == 0 then
-                client.log("Current clantag: "..variables.clantag)
+                client_log("Current clantag: "..variables.clantag)
                 return true
             end
 
@@ -186,7 +184,7 @@ callbacks = {
                 elseif texts[i] == "\\t" then texts[i] = "\t" 
                 end
 
-                if string.len(final_text) == 0 then 
+                if final_text:len() == 0 then 
                     final_text = texts[i]
                 else
                     final_text = string.format("%s %s", final_text, texts[i])
@@ -197,30 +195,32 @@ callbacks = {
             database.write("deadwinter.clantag", final_text)
             variables.initialize_clantag(final_text)
             variables.initialize_display_text()
-            client.log("Current clantag: "..variables.clantag)
+            client_log("Current clantag: "..variables.clantag)
             return true
         end
     end,
     
     ui_checkbox = function(self)
         if self == variables.clantag_enabled then
-            ui.set_visible(variables.clantag_type, ui.get(self))
+            ui_set_visible(variables.clantag_type, ui_get(self))
 
-            if ui.get(variables.clantag_type) == "Builder" then
-                ui.set_visible(variables.clantag_update_interval, ui.get(self))
+            if ui_get(variables.clantag_type) == "Builder" then
+                ui_set_visible(variables.clantag_update_interval, ui_get(self))
             end
 
-            if not ui.get(self) then 
-                client.set_clan_tag(variables.original_clantag)
+            if not ui_get(self) then 
+                local original_clantag = functions.get_original_clantag()
+                client_set_clan_tag(original_clantag)
             end
 
             return
         end
 
         if self == variables.ref_gamesense_clantag then
-            if not ui.get(variables.clantag_enabled) then
-                client.delay_call(globals.tickinterval(), function()
-                    client.set_clan_tag(variables.original_clantag)
+            if not ui_get(variables.clantag_enabled) then
+                client_delay_call(globals_tickinterval(), function()
+                    local original_clantag = functions.get_original_clantag()
+                    client_set_clan_tag(original_clantag)
                 end)
                 return
             end
@@ -228,27 +228,26 @@ callbacks = {
     end,
 
     ui_combobox = function(self)
-        local is_builder = ui.get(self) == "Builder"
-        ui.set_visible(variables.clantag_update_interval, is_builder)
+        local is_builder = ui_get(self) == "Builder"
+        ui_set_visible(variables.clantag_update_interval, is_builder)
     end,
 
     shutdown = function()
-        client.set_clan_tag(functions.get_original_clantag())
+        local original_clantag = functions.get_original_clantag()
+        client_set_clan_tag(original_clantag)
     end
 }
 
-variables.original_clantag = functions.get_original_clantag()
 variables.initialize_clantag(database.read("deadwinter.clantag") or "set_your_clantag")
 variables.initialize_display_text()
-client.log("Current clantag: \""..variables.clantag.."\". Example: set_clantag netorare.gang")
+client_log("Current clantag: \""..variables.clantag.."\". Example: set_clantag netorare.gang")
 
-ui.set_visible(variables.clantag_type, false)
-ui.set_visible(variables.clantag_update_interval, false)
-ui.set_callback(variables.clantag_enabled, callbacks.ui_checkbox)
-ui.set_callback(variables.ref_gamesense_clantag, callbacks.ui_checkbox)
-ui.set_callback(variables.clantag_type, callbacks.ui_combobox)
-client.set_event_callback("paint", callbacks.paint)
-client.set_event_callback("run_command", callbacks.run_command)
-client.set_event_callback("player_connect_full", callbacks.player_connect_full)
-client.set_event_callback("console_input", callbacks.console_input)
-client.set_event_callback("shutdown", callbacks.shutdown)
+ui_set_visible(variables.clantag_type, false)
+ui_set_visible(variables.clantag_update_interval, false)
+ui_set_callback(variables.clantag_enabled, callbacks.ui_checkbox)
+ui_set_callback(variables.ref_gamesense_clantag, callbacks.ui_checkbox)
+ui_set_callback(variables.clantag_type, callbacks.ui_combobox)
+client_set_event_callback("paint", callbacks.paint)
+client_set_event_callback("run_command", callbacks.run_command)
+client_set_event_callback("console_input", callbacks.console_input)
+client_set_event_callback("shutdown", callbacks.shutdown)
