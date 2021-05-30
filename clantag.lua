@@ -37,6 +37,8 @@ variables = {
 
     built_clantag = { },
 
+    loop_clantag_index = { },
+
     initialize_clantag = function(text)
         variables.clantag = text
         variables.clantag_characters = { }
@@ -52,6 +54,17 @@ variables = {
         local display_text = "\0"
         for i=1, #variables.clantag_characters - 1 do
             display_text = " "..display_text
+        end
+
+        local length = #variables.clantag * 2 + 15
+        
+        variables.loop_clantag_index = { }
+        local idx = -1
+        for i = 0, length do
+            if i < #variables.clantag + 3 or i > #variables.clantag + 11 then
+                idx = idx + 1
+            end
+            variables.loop_clantag_index[i + 1] = idx
         end
 
         local last_text = display_text
@@ -94,7 +107,7 @@ functions = {
 
     -- credit goes to @sapphyrus
     gamesense_animation = function(text, indices)
-        local text_anim = "               " .. text .. "                      " 
+        local text_anim = "                 " .. text .. "                      " 
         local tickcount = globals_tickcount() + functions.time_to_ticks(client_latency())
         local i = tickcount / functions.time_to_ticks(0.3)
         i = math_floor(i % #indices)
@@ -125,7 +138,7 @@ functions = {
             end
 
         elseif ui_get(variables.clantag_type) == "Loop" then
-            local clan_tag = functions.gamesense_animation(variables.clantag, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 11, 11, 11, 11, 11, 11, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22})
+            local clan_tag = functions.gamesense_animation(variables.clantag, variables.loop_clantag_index)
             
             if clan_tag ~= variables.previous_clantag then
                 client_set_clan_tag(clan_tag)
